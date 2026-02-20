@@ -11,7 +11,7 @@ def compute_triggers(rows: list[dict], cfg: dict) -> list[dict]:
         )
         is_pullback = (
             row.get("recent_breakout", 0) >= 1
-            and row.get("low", 0) <= row.get("ma20", 0) * (1 + cfg["pullback_tol"])
+            and row.get("low", 0) <= float(row.get("ma20", 0)) * (1 + cfg["pullback_tol"])
             and row.get("close", 0) >= row.get("ma20", 0)
             and row.get("vol_ratio", 0) <= cfg["pullback_vol_ratio_max"]
             and row.get("flow_3d", 0) > 0

@@ -30,7 +30,7 @@ def _index(rows: list[dict], key: str) -> dict:
 
 def run_daily(date: str, pool_id: int | None, pool_file: str | None, config: str) -> None:
     cfg = _load_cfg(config)
-    ds = DataStore(cfg["db"]["uri"])
+    ds = DataStore(cfg["db"]["read_uri"], cfg["db"]["write_uri"])
     universe = ds.get_pool_members(pool_id, date) if pool_id is not None else [r["ts_code"] for r in load_pool_file(pool_file)]
 
     cal = ds.get_trade_calendar("19900101", date)
@@ -38,11 +38,13 @@ def run_daily(date: str, pool_id: int | None, pool_file: str | None, config: str
     start = cal[max(0, len(cal) - cfg["window"]["lookback_days"])] if cal else date
 
     price = add_price_features(ds.load_price_window(universe, start, date), cfg["trigger"]["breakout_lookback"])
-    today = [r for r in price if r["trade_date"] == date]
+    today = [r for r in price if str(r["trade_date"]) == date]
+    print(f"[DEBUG] Loaded price: {len(price)} records, today: {len(today)} records")
     labels = _index(normalize_label(ds.load_label_daily(universe, date)), "ts_code")
-    flow_today = _index([r for r in add_flow_features(ds.load_moneyflow_window(universe, start, date), price) if r["trade_date"] == date], "ts_code")
+    flow_today = _index([r for r in add_flow_features(ds.load_moneyflow_window(universe, start, date), price) if str(r["trade_date"]) == date], "ts_code")
     chip = _index(add_chip_features(ds.load_chip_daily(universe, date)), "ts_code")
     score = _index(ds.load_dws_scores_daily(universe, date), "ts_code")
+    print(f"[DEBUG] Loaded labels: {len(labels)}, flow: {len(flow_today)}, chip: {len(chip)}, score: {len(score)}")
 
     rows = []
     for r in today:
@@ -53,14 +55,20 @@ def run_daily(date: str, pool_id: int | None, pool_file: str | None, config: str
         x.update(score.get(r["ts_code"], {}))
         rows.append(x)
 
+    print(f"[DEBUG] Before hard filters: {len(rows)} rows")
     rows = apply_hard_filters(rows, cfg["filters"])
+    print(f"[DEBUG] After hard filters: {len(rows)} rows")
     rows = compute_triggers(rows, cfg["trigger"])
+    print(f"[DEBUG] After triggers: {len(rows)} rows")
     strengths = compute_trigger_strength(rows)
+    print(f"[DEBUG] After trigger strength: {len(rows)} rows, {len(strengths)} strengths")
     bases = compute_base_score(rows, cfg["scoring"]["base_weights"])
+    print(f"[DEBUG] After base score: {len(rows)} rows, {len(bases)} bases")
     for i, row in enumerate(rows):
         row["trigger_strength"] = strengths[i]
         row["base_score"] = bases[i]
     penalties = compute_risk_penalty(rows, cfg["risk"])
+    print(f"[DEBUG] After risk penalty: {len(rows)} rows, {len(penalties)} penalties")
     for i, row in enumerate(rows):
         row["pool_final_score"] = max(0, min(100, row["base_score"] + cfg["scoring"]["trigger_bonus_weight"] * row["trigger_strength"] - penalties[i]))
 
@@ -73,8 +81,8 @@ def run_daily(date: str, pool_id: int | None, pool_file: str | None, config: str
         row["pool_id"] = int(pool_id) if pool_id is not None else -1
         row["trade_date"] = date
         row["updated_at"] = now
-        row["key_levels"] = json.dumps({"ma20": row.get("ma20"), "ma60": row.get("ma60"), "high_60": row.get("high_60"), "breakout_level": row.get("high_60")}, ensure_ascii=False)
-        row["reasons"] = json.dumps({"trigger": row.get("trigger_type"), "flow_3d": row.get("flow_3d"), "vol_ratio": row.get("vol_ratio")}, ensure_ascii=False)
+        row["key_levels"] = json.dumps({"ma20": float(row.get("ma20") or 0), "ma60": float(row.get("ma60") or 0), "high_60": float(row.get("high_60") or 0), "breakout_level": float(row.get("high_60") or 0)}, ensure_ascii=False)
+        row["reasons"] = json.dumps({"trigger": row.get("trigger_type"), "flow_3d": float(row.get("flow_3d") or 0), "vol_ratio": float(row.get("vol_ratio") or 0)}, ensure_ascii=False)
 
     ds.upsert_pool_replay_daily(rows)
     health = build_health(rows, date, int(pool_id) if pool_id is not None else -1)

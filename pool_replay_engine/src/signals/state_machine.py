@@ -34,13 +34,21 @@ def state_to_action(state: str, is_pullback: bool = False) -> str:
 
 
 def apply_state_machine(rows: list[dict], prev_states: dict[str, str], weaken_vol_ratio: float) -> list[dict]:
+    print(f"[DEBUG] apply_state_machine called with {len(rows)} rows")
     out = []
-    for row in rows:
-        prev = prev_states.get(row["ts_code"], "WATCH")
-        state = next_state(row, prev, weaken_vol_ratio)
-        n = dict(row)
-        n["prev_state"] = prev
-        n["state"] = state
-        n["action"] = state_to_action(state, bool(row.get("is_pullback", False)))
-        out.append(n)
+    try:
+        for row in rows:
+            prev = prev_states.get(row["ts_code"], "WATCH")
+            state = next_state(row, prev, weaken_vol_ratio)
+            n = dict(row)
+            n["prev_state"] = prev
+            n["state"] = state
+            n["action"] = state_to_action(state, bool(row.get("is_pullback", False)))
+            out.append(n)
+        print(f"[DEBUG] apply_state_machine returning {len(out)} rows")
+    except Exception as e:
+        print(f"[DEBUG] apply_state_machine error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     return out

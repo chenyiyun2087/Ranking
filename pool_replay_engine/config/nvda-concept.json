@@ -5,7 +5,7 @@
   },
   "pool": {"mode": "db", "topk_battle": 8, "topk_candidate": 30, "topk_hold": 3},
   "window": {"lookback_days": 120},
-  "filters": {"new_stock_days": 60, "min_amount": 50000000, "avoid_one_price": true},
+  "filters": {"new_stock_days": 60, "min_amount": 1000000, "avoid_one_price": true},
   "trigger": {
     "breakout_lookback": 60,
     "vol_ratio_min": 1.5,
