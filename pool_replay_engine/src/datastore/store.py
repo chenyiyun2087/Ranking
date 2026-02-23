@@ -141,8 +141,10 @@ class DataStore:
             return []
         ph = ",".join("%s" for _ in universe)
         sql = f"""
-        SELECT m.ts_code, m.momentum_score, t.technical_score, c.capital_score, ch.chip_score
+        SELECT m.ts_code, m.momentum_score, v.value_score, q.quality_score, t.technical_score, c.capital_score, ch.chip_score
         FROM dws_momentum_score m
+        LEFT JOIN dws_value_score v ON m.ts_code=v.ts_code AND m.trade_date=v.trade_date
+        LEFT JOIN dws_quality_score q ON m.ts_code=q.ts_code AND m.trade_date=q.trade_date
         LEFT JOIN dws_technical_score t ON m.ts_code=t.ts_code AND m.trade_date=t.trade_date
         LEFT JOIN dws_capital_score c ON m.ts_code=c.ts_code AND m.trade_date=c.trade_date
         LEFT JOIN dws_chip_score ch ON m.ts_code=ch.ts_code AND m.trade_date=ch.trade_date

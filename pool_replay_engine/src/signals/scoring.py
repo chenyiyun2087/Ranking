@@ -7,10 +7,12 @@ def compute_base_score(rows: list[dict], weights: dict) -> list[float]:
     result = []
     for row in rows:
         result.append(
-            weights["momentum"] * float(row.get("momentum_score") or 0)
-            + weights["technical"] * float(row.get("technical_score") or 0)
-            + weights["capital"] * float(row.get("capital_score") or 0)
-            + weights["chip"] * float(row.get("chip_score") or 0)
+            weights.get("momentum", 0) * float(row.get("momentum_score") or 0)
+            + weights.get("value", 0) * float(row.get("value_score") or 0)
+            + weights.get("quality", 0) * float(row.get("quality_score") or 0)
+            + weights.get("technical", 0) * float(row.get("technical_score") or 0)
+            + weights.get("capital", 0) * float(row.get("capital_score") or 0)
+            + weights.get("chip", 0) * float(row.get("chip_score") or 0)
         )
     return result
 

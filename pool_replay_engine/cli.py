@@ -73,7 +73,8 @@ def run_daily(date: str, pool_id: int | None, pool_file: str | None, config: str
         row["pool_final_score"] = max(0, min(100, row["base_score"] + cfg["scoring"]["trigger_bonus_weight"] * row["trigger_strength"] - penalties[i]))
 
     prev_states = ds.load_prev_states(pool_id, prev_date) if (pool_id is not None and prev_date) else {}
-    rows = apply_state_machine(rows, prev_states, cfg["risk"]["weaken_break_ma20_vol_ratio"])
+    setup_threshold = cfg["scoring"].get("setup_base_score_threshold", 15)
+    rows = apply_state_machine(rows, prev_states, cfg["risk"]["weaken_break_ma20_vol_ratio"], setup_threshold)
 
     now = datetime.utcnow().isoformat()
     for row in rows:

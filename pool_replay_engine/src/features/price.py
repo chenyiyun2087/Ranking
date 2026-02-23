@@ -11,10 +11,12 @@ def add_price_features(rows: list[dict], breakout_lookback: int = 60) -> list[di
         for i, r in enumerate(series):
             window20 = series[max(0, i - 19): i + 1]
             window60 = series[max(0, i - 59): i + 1]
-            highs = [x["high"] for x in series[max(0, i - breakout_lookback + 1): i + 1]]
+            # high_60 should be the max high from past 59 trading days (NOT including today)
+            # This matches SQL: DATE_SUB('20260213', INTERVAL 59 DAY) ... trade_date < '20260213'
+            highs = [x["high"] for x in series[max(0, i - 59): i]]
             r["ma20"] = sum(x["close"] for x in window20) / len(window20)
             r["ma60"] = sum(x["close"] for x in window60) / len(window60)
-            r["high_60"] = max(highs)
+            r["high_60"] = max(highs) if highs else r.get("high", 0)
             r["vol_ma20"] = sum(x["vol"] for x in window20) / len(window20)
             r["vol_ratio"] = (r["vol"] / r["vol_ma20"]) if r["vol_ma20"] else 0
             spread = (r["high"] - r["low"]) or 1

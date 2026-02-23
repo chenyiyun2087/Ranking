@@ -5,7 +5,7 @@
   },
   "pool": {"mode": "db", "topk_battle": 8, "topk_candidate": 30, "topk_hold": 3},
   "window": {"lookback_days": 120},
-  "filters": {"new_stock_days": 60, "min_amount": 50000000, "avoid_one_price": true},
+  "filters": {"new_stock_days": 60, "min_amount": 5000, "avoid_one_price": true},
   "trigger": {
     "breakout_lookback": 60,
     "vol_ratio_min": 1.5,
@@ -16,7 +16,8 @@
   },
   "risk": {"atr_pct_max": 0.08, "weaken_break_ma20_vol_ratio": 1.2, "high_cost_dev": 0.12},
   "scoring": {
-    "base_weights": {"momentum": 0.35, "technical": 0.3, "capital": 0.25, "chip": 0.1},
-    "trigger_bonus_weight": 0.4
+    "base_weights": {"momentum": 0.25, "value": 0.20, "quality": 0.20, "technical": 0.15, "capital": 0.10, "chip": 0.10},
+    "trigger_bonus_weight": 0.4,
+    "setup_base_score_threshold": 10
   }
 }

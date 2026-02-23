@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-def next_state(row: dict, prev_state: str, weaken_vol_ratio: float) -> str:
+def next_state(row: dict, prev_state: str, weaken_vol_ratio: float, setup_threshold: float = 15) -> str:
     if row.get("avoid", 0) == 1:
         return "AVOID"
     if row.get("close", 0) < row.get("ma60", 0) and prev_state == "WEAKEN":
@@ -12,7 +12,10 @@ def next_state(row: dict, prev_state: str, weaken_vol_ratio: float) -> str:
         return "TRIGGER"
     if prev_state == "TRIGGER" and row.get("close", 0) >= row.get("ma20", 0) and row.get("flow_3d", 0) >= 0:
         return "HOLD"
-    if row.get("close", 0) > row.get("ma60", 0) and row.get("ma20_slope", 0) > 0 and row.get("base_score", 0) >= 60:
+    if row.get("close", 0) > row.get("ma60", 0) and row.get("ma20_slope", 0) > 0 and row.get("base_score", 0) >= setup_threshold:
+        # Check if we can jump directly to TRIGGER (for same-day state transitions)
+        if row.get("is_trigger", False):
+            return "TRIGGER"
         return "SETUP"
     return "WATCH"
 
@@ -33,13 +36,13 @@ def state_to_action(state: str, is_pullback: bool = False) -> str:
     return "WATCH"
 
 
-def apply_state_machine(rows: list[dict], prev_states: dict[str, str], weaken_vol_ratio: float) -> list[dict]:
+def apply_state_machine(rows: list[dict], prev_states: dict[str, str], weaken_vol_ratio: float, setup_threshold: float = 15) -> list[dict]:
     print(f"[DEBUG] apply_state_machine called with {len(rows)} rows")
     out = []
     try:
         for row in rows:
             prev = prev_states.get(row["ts_code"], "WATCH")
-            state = next_state(row, prev, weaken_vol_ratio)
+            state = next_state(row, prev, weaken_vol_ratio, setup_threshold)
             n = dict(row)
             n["prev_state"] = prev
             n["state"] = state

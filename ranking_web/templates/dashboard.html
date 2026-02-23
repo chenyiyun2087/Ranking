@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero card">
+    <div>
+        <h2>评分系统总览</h2>
+        <p>最新报告：{{ health.report_name or '暂无输出' }}{% if health.report_mtime %} · {{ health.report_mtime }}{% endif %}</p>
+    </div>
+    <div class="hero-tag">Scoring Core</div>
+</section>
+
+<section class="grid cards-6 stagger">
+    <article class="metric card">
+        <h3>TRIGGER</h3>
+        <strong class="positive">{{ health.n_trigger }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>SETUP</h3>
+        <strong>{{ health.n_setup }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>HOLD</h3>
+        <strong>{{ health.n_hold }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>WEAKEN</h3>
+        <strong class="warn">{{ health.n_weaken }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>AVOID</h3>
+        <strong class="danger">{{ health.n_avoid }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>Up Ratio</h3>
+        <strong>{{ '%.2f'|format(health.up_ratio) }}%</strong>
+    </article>
+</section>
+
+<section class="grid cols-2">
+    <article class="card">
+        <h3 class="section-title">手动执行评分</h3>
+        <form action="{{ url_for('run_score') }}" method="post" class="form-grid">
+            <label>
+                交易日 (YYYYMMDD)
+                <input type="text" name="trade_date" placeholder="默认今天">
+            </label>
+            <label>
+                pool_id (可选)
+                <input type="text" name="pool_id" placeholder="例如 3">
+            </label>
+            <label>
+                pool_file (可选)
+                <select name="pool_file">
+                    <option value="">请选择</option>
+                    {% for f in pool_files %}
+                        <option value="{{ f }}">{{ f }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                配置路径
+                <input type="text" name="config_path" value="pool_replay_engine/config/default.yaml">
+            </label>
+            <button class="btn primary" type="submit">运行评分任务</button>
+        </form>
+        <p class="hint">要求二选一：`pool_id` 或 `pool_file`。</p>
+    </article>
+
+    <article class="card">
+        <h3 class="section-title">输出文件状态</h3>
+        <div class="mini-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>列表</th>
+                        <th>文件</th>
+                        <th>行数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, value in score_tables.items() %}
+                    <tr>
+                        <td>{{ key|upper }}</td>
+                        <td>{{ value.file }}</td>
+                        <td>{{ value.total }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+
+<section class="grid cols-3">
+    {% for key in ['battle', 'candidate', 'risk'] %}
+    <article class="card">
+        <h3 class="section-title">{{ key|upper }} Top 5</h3>
+        <div class="mini-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ts_code</th>
+                        <th>state</th>
+                        <th>final</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if score_tables[key].rows %}
+                        {% for row in score_tables[key].rows[:5] %}
+                        <tr>
+                            <td>{{ row.ts_code }}</td>
+                            <td>{{ row.state }}</td>
+                            <td>{{ row.pool_final_score }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="empty">暂无数据</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+{% endblock %}

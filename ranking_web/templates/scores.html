@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero card">
+    <div>
+        <h2>评分看板</h2>
+        <p>展示输出 CSV 明细，支持按池别快速切换和搜索。</p>
+    </div>
+    <div class="hero-tag">Scores</div>
+</section>
+
+<section class="grid cards-4">
+    <article class="metric card">
+        <h3>TRIGGER</h3>
+        <strong class="positive">{{ health.n_trigger }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>SETUP</h3>
+        <strong>{{ health.n_setup }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>WEAKEN</h3>
+        <strong class="warn">{{ health.n_weaken }}</strong>
+    </article>
+    <article class="metric card">
+        <h3>UP RATIO</h3>
+        <strong>{{ '%.2f'|format(health.up_ratio) }}%</strong>
+    </article>
+</section>
+
+<section class="card">
+    <h3 class="section-title">池别切换</h3>
+    <div class="tab-row">
+        {% for key, table in score_tables.items() %}
+            <a href="{{ url_for('scores_page', table=key) }}" class="tab {{ 'active' if active_table == key else '' }}">
+                {{ key|upper }} ({{ table.total }})
+            </a>
+        {% endfor %}
+    </div>
+
+    <div class="toolbar">
+        <input id="tableFilter" type="text" placeholder="搜索 ts_code / state / industry..." data-table-filter>
+    </div>
+
+    {% set active = score_tables[active_table] %}
+    <div class="table-wrap" style="max-height: 70vh;">
+        <table id="scoreTable">
+            <thead>
+            <tr>
+                {% for h in active.headers %}
+                    <th>{{ h }}</th>
+                {% endfor %}
+            </tr>
+            </thead>
+            <tbody>
+            {% if active.rows %}
+                {% for row in active.rows %}
+                <tr>
+                    {% for h in active.headers %}
+                        <td>{{ row[h] }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="{{ active.headers|length if active.headers else 1 }}" class="empty">暂无数据</td>
+                </tr>
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

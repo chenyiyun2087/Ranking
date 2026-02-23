@@ -248,4 +248,175 @@ pytest -q
 - `store.py` 增加更严格字段容错与批量写优化
 - pullback “曾经突破”的定义可改成更严格窗口事件
 - 报告内容可增加 reasons 的可读化解释
+---
 
+## 8. 权重配置指南
+
+### 配置位置
+
+权重配置在 `pool_replay_engine/config/default.yaml` 中的 `scoring` 块：
+
+```json
+"scoring": {
+  "base_weights": {
+    "momentum": 0.25,      // 动量 (25%)
+    "value": 0.20,         // 估值 (20%)
+    "quality": 0.20,       // 质量 (20%)
+    "technical": 0.15,     // 技术 (15%)
+    "capital": 0.10,       // 资金 (10%)
+    "chip": 0.10           // 筹码 (10%)
+  },
+  "trigger_bonus_weight": 0.4,          // TRIGGER时的奖励权重 (40%)
+  "setup_base_score_threshold": 10      // SETUP入选阈值
+}
+```
+
+### 权重说明
+
+**各维度含义**：
+- `momentum`: 动量维度（DWS中的 `dws_momentum_score`）
+- `value`: 估值维度（DWS中的 `dws_value_score`，PE/PB/PS）
+- `quality`: 质量维度（DWS中的 `dws_quality_score`，ROE/利润率）
+- `technical`: 技术维度（DWS中的 `dws_technical_score`，MACD/KDJ等）
+- `capital`: 资金维度（DWS中的 `dws_capital_score`，大单资金）
+- `chip`: 筹码维度（DWS中的 `dws_chip_score`，持仓集中度）
+
+**权重总和建议不超过 1.0**（代表100%）。虽然技术上可超过1，但通常不推荐：
+- 权重 > 1：会导致某个因子过度强调，可能引致评分过度波动
+- 权重 < 1：评分会被压低，影响评分区分度
+- 最佳实践：总和 = 1.0，通过调整各因子比例来改变策略偏向
+
+### 实际应用公式
+
+```text
+base_score = momentum_score × 0.25 
+           + value_score × 0.20 
+           + quality_score × 0.20 
+           + technical_score × 0.15 
+           + capital_score × 0.10 
+           + chip_score × 0.10
+
+pool_final_score = clip(base_score + trigger_bonus_weight × trigger_strength - risk_penalty, 0, 100)
+```
+
+---
+
+## 9. 执行评分流程与输出
+
+### 执行命令
+
+配置完权重后，执行：
+
+```bash
+# 自选股池评分
+python -m pool_replay_engine.cli run-daily --date 20260213 --pool-file pool.csv
+
+# 指定数据库池评分
+python -m pool_replay_engine.cli run-daily --date 20260213 --pool-id <pool_id>
+
+# 指定其他日期和配置
+python -m pool_replay_engine.cli run-daily --date YYYYMMDD --pool-file <pool_file> --config <config_path>
+```
+
+### 输出文件
+
+执行后自动在 `output/` 目录生成以下文件：
+
+```
+output/
+├── report_pool_-1_20260213.md       # 📋 评分摘要 (n_trigger, n_setup等)
+├── pool_risk_list.csv              # 📊 完整清单 (所有股票评分明细)
+├── pool_battle_pool.csv            # ⚡ TRIGGER池 (可直接交易)
+├── pool_candidate_pool.csv         # 📈 SETUP池 (等待触发)
+└── pool_hold_watch.csv             # 持仓观察 (HOLD状态)
+```
+
+### 快速查看结果
+
+**查看评分摘要**：
+```bash
+cat output/report_pool_-1_20260213.md
+```
+
+输出示例：
+```
+# Pool Replay Report pool=-1 date=20260213
+
+## 池子健康度摘要
+- n_trigger=1 n_setup=3 n_hold=0 n_weaken=115 n_drop=0 n_avoid=0
+- up_ratio=35.92%
+```
+
+**查看完整列表前20行**：
+```bash
+head -20 output/pool_risk_list.csv
+```
+
+**查看TRIGGER股票**：
+```bash
+grep "TRIGGER" output/pool_risk_list.csv
+```
+
+### 数据库持久化
+
+评分结果同时写入两个表（自动持久化）：
+
+**1. `dws_pool_replay_daily`** - 每日评分明细
+```bash
+mysql -h localhost -u root -p<password> ranking -e \
+  "SELECT ts_code, state, base_score, pool_final_score 
+   FROM dws_pool_replay_daily 
+   WHERE trade_date='20260213' AND pool_id=-1 AND state='TRIGGER';"
+```
+
+**2. `dws_pool_health_daily`** - 池子健康度汇总
+```bash
+mysql -h localhost -u root -p<password> ranking -e \
+  "SELECT * FROM dws_pool_health_daily 
+   WHERE trade_date='20260213' AND pool_id=-1;"
+```
+
+### 修改权重后的重新评分
+
+1. 编辑 `pool_replay_engine/config/default.yaml` 中的权重
+2. 重新执行评分命令
+3. 新的 `output/` 文件会覆盖旧文件
+4. 数据库表记录保留历史（按 pool_id 和 trade_date 区分）
+
+---
+
+## 10. Web 管理平台（新增）
+
+新增了一个 Flask Web 平台，提供三个核心模块：
+
+- 任务调度：创建/启停/删除评分定时任务，支持立即执行和执行历史查看
+- 股票池更新：在线维护 `pool*.csv`（增删代码、CSV 上传替换）
+- 评分展示：展示 `output/` 中 battle/candidate/hold/risk 明细与最新健康度
+
+### 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### 启动平台
+
+```bash
+python run_web.py
+```
+
+默认访问地址：
+
+```text
+http://127.0.0.1:8050
+```
+
+### 代码位置
+
+- `run_web.py`: Web 启动入口
+- `ranking_web/app.py`: 路由与页面控制
+- `ranking_web/scheduler.py`: 内置轻量定时任务与持久化
+- `ranking_web/services.py`: 评分执行、CSV 读写、数据汇总服务
+- `ranking_web/templates/`: 页面模板
+- `ranking_web/static/`: 样式与前端交互
+- `web_data/scheduler_state.json`: 调度任务与执行历史持久化文件
